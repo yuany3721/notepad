@@ -1,0 +1,22 @@
+{
+  "name": "vue-python-notepad",
+  "version": "1.0.0",
+  "description": "Vue3 + Python Notepad 应用",
+  "private": true,
+  "scripts": {
+    "dev:frontend": "cd frontend && pnpm dev",
+    "dev:backend": "cd backend && venv\\Scripts\\python main.py",
+    "dev": "concurrently \"pnpm dev:frontend\" \"pnpm dev:backend\"",
+    "build": "cd frontend && pnpm build",
+    "test:frontend": "cd frontend && pnpm test",
+    "test:backend": "cd backend && venv\\Scripts\\pytest",
+    "test": "pnpm test:frontend && pnpm test:backend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  }
+}
