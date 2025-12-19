@@ -21,7 +21,7 @@ services:
     container_name: notepad-frontend
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "${EXTERNAL_PORT:-80}:80"
     depends_on:
       - backend
     env_file:

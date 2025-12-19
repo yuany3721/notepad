@@ -16,15 +16,11 @@ nano .env
 
 **必须修改的配置：**
 - `FILE_LIST_PASSWORD` - 设置强密码（建议使用随机生成的密码）
-- `JWT_SECRET_KEY` - 设置随机密钥（建议使用 32 位以上随机字符串）
 
-**生成强密码和密钥的方法：**
+**生成强密码的方法：**
 ```bash
 # 生成密码
 openssl rand -base64 32
-
-# 生成 JWT 密钥
-openssl rand -hex 32
 ```
 
 ### 2. 文件权限设置
@@ -69,17 +65,14 @@ curl http://localhost/api/health
 
 | 变量名 | 说明 | 默认值 | 是否必须修改 |
 |--------|------|--------|------------|
-| `FILE_LIST_PASSWORD` | 文件列表访问密码 | admin123 | **是** |
-| `JWT_SECRET_KEY` | JWT 签名密钥 | your-secret-key | **是** |
-| `NOTES_DIR` | 文件存储目录 | /app/data | 否 |
-| `MAX_FILE_SIZE` | 最大文件大小（字节） | 100000 | 否 |
-| `JWT_EXPIRE_MINUTES` | JWT 过期时间（分钟） | 1440 | 否 |
+| `APP_NAME` | 应用名称 | Vue3 Python Notepad | 否 |
+| `FILE_LIST_PASSWORD` | 文件列表访问密码 | your_secure_password_here | **是** |
+| `EXTERNAL_PORT` | 容器对外暴露的端口 | 80 | 否 |
 
 ## 安全建议
 
 1. **定期更换密码**
    - 建议每 3 个月更换一次 `FILE_LIST_PASSWORD`
-   - 每年更换一次 `JWT_SECRET_KEY`
 
 2. **使用 HTTPS**
    - 配置反向代理（Nginx/Traefik）
@@ -100,8 +93,8 @@ curl http://localhost/api/health
    - 检查 `.env` 文件中的 `FILE_LIST_PASSWORD`
    - 重启容器：`docker-compose restart backend`
 
-2. **JWT 错误**
-   - 检查 `.env` 文件中的 `JWT_SECRET_KEY`
+2. **认证错误**
+   - 检查 `.env` 文件中的 `FILE_LIST_PASSWORD`
    - 清除浏览器 localStorage 中的 token
 
 3. **权限问题**
