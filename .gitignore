@@ -81,6 +81,7 @@ backend/data/
 *.md
 !README.md
 !DOCKER_DEPLOY.md
+!DEPLOYMENT.md
 
 # Backup files
 *.bak
