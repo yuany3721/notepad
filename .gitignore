@@ -34,6 +34,9 @@ backend/env/
 ehthumbs.db
 Thumbs.db
 
+# iFlow CLI
+.iflow/
+
 # Logs
 *.log
 npm-debug.log*
