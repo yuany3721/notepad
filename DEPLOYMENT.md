@@ -26,8 +26,8 @@ openssl rand -base64 32
 ### 2. 文件权限设置
 
 ```bash
-# 创建文件目录
-mkdir -p files
+# 创建文件目录（根据 .env 中的 FILES_DIR 配置）
+mkdir -p ${FILES_DIR:-./files}
 
 # 设置适当的权限
 chmod 755 files
@@ -68,6 +68,7 @@ curl http://localhost/api/health
 | `APP_NAME` | 应用名称 | Vue3 Python Notepad | 否 |
 | `FILE_LIST_PASSWORD` | 文件列表访问密码 | your_secure_password_here | **是** |
 | `EXTERNAL_PORT` | 容器对外暴露的端口 | 80 | 否 |
+| `FILES_DIR` | 文件存储目录（宿主机路径） | ./files | 否 |
 
 ## 安全建议
 
@@ -78,8 +79,8 @@ curl http://localhost/api/health
    - 配置反向代理（Nginx/Traefik）
    - 申请 SSL 证书（Let's Encrypt）
 
-3. **备份策略**
-   - 定期备份 `./files` 目录
+4. **备份**
+   - 定期备份 `FILES_DIR` 配置的目录
    - 备份 `.env` 文件（存储在安全位置）
 
 4. **监控**

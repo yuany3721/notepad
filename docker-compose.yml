@@ -8,7 +8,7 @@ services:
     container_name: notepad-backend
     restart: unless-stopped
     volumes:
-      - ./files:/app/data
+      - ${FILES_DIR:-./files}:/app/data
     env_file:
       - .env
     networks:
