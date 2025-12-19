@@ -34,9 +34,6 @@ backend/env/
 ehthumbs.db
 Thumbs.db
 
-# iFlow CLI
-.iflow/
-
 # Logs
 *.log
 npm-debug.log*
@@ -78,7 +75,6 @@ coverage/
 files/
 backend/data/
 *.txt
-*.md
 !README.md
 !DOCKER_DEPLOY.md
 !DEPLOYMENT.md
