@@ -17,7 +17,7 @@ class FileService:
         if len(filename) > 200 or len(filename) < 1:
             return False
 
-        illegal_chars = r'[^a-zA-Z0-9_.-]'
+        illegal_chars = r'[^a-zA-Z0-9_.\-\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]'
         if (
             re.search(illegal_chars, filename)
             or filename.startswith("_")
