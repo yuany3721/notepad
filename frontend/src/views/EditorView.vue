@@ -93,6 +93,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useEditorStore } from '@/stores/editor'
 import { notesApi, filesApi } from '@/services/api'
 import { useWebSocket } from '@/services/websocket'
+import { emitter } from '@/utils/eventBus'
 import StatusIndicator from '@/components/common/StatusIndicator.vue'
 
 const route = useRoute()
@@ -149,12 +150,8 @@ const handleInput = () => {
     if (ws && ws.readyState === WebSocket.OPEN) {
       if (testingMode.value) console.log('✅ Using WebSocket to save')
       try {
-        // 确保文件名包含 .txt 后缀
-        const filename = editorStore.currentFile.toLowerCase().endsWith('.txt') 
-          ? editorStore.currentFile 
-          : `${editorStore.currentFile}.txt`
-        if (testingMode.value) console.log('Sending to WebSocket with filename:', filename)
-        sendSave(filename, editorStore.content)
+        if (testingMode.value) console.log('Sending to WebSocket with filename:', editorStore.currentFile)
+        sendSave(editorStore.currentFile, editorStore.content)
         if (testingMode.value) console.log('WebSocket message sent, waiting for response...')
         // 设置超时，如果 WebSocket 5秒内没有响应，回退到 HTTP
         setTimeout(() => {
@@ -197,7 +194,7 @@ const cancelRename = () => {
 }
 
 const deleteFile = async () => {
-  if (!confirm(`确定要删除文件 "${displayName}" 吗？此操作不可恢复。`)) {
+  if (!confirm(`确定要删除文件 "${displayName.value}" 吗？此操作不可恢复。`)) {
     return
   }
   
@@ -217,14 +214,9 @@ const deleteFile = async () => {
 }
 
 const testSave = async () => {
-  // 确保文件名包含 .txt 后缀
-  const filename = editorStore.currentFile.toLowerCase().endsWith('.txt') 
-    ? editorStore.currentFile 
-    : `${editorStore.currentFile}.txt`
-  
   if (testingMode.value) {
     console.log('=== Manual Test Save ===')
-    console.log('Current file:', filename)
+    console.log('Current file:', editorStore.currentFile)
     console.log('Content length:', editorStore.content.length)
     console.log('Content preview:', editorStore.content.substring(0, 100))
   }
@@ -232,7 +224,7 @@ const testSave = async () => {
   editorStore.setSaveStatus('saving')
   
   try {
-    const response = await notesApi.saveFile(filename, editorStore.content)
+    const response = await notesApi.saveFile(editorStore.currentFile, editorStore.content)
     if (testingMode.value) console.log('Test save response:', response)
     editorStore.setSaveStatus('saved')
     if (testingMode.value) console.log('✅ Test save successful!')
@@ -275,47 +267,49 @@ const confirmRename = async () => {
   
   try {
     const oldFilename = editorStore.currentFile
-    const newFullFilename = newFilename.value.toLowerCase().endsWith('.txt') 
-      ? newFilename.value 
-      : `${newFilename.value}.txt`
     
-    await filesApi.renameFile(oldFilename, newFullFilename)
+    // 先断开当前WebSocket连接
+    disconnect()
     
-    // 更新当前文件名
-    editorStore.setCurrentFile(newFullFilename)
+    await filesApi.renameFile(oldFilename, newFilename.value)
+    
+    // 重命名成功，更新当前文件名
+    editorStore.setCurrentFile(newFilename.value)
     
     // 更新URL
-    router.replace(`/notes/${getDisplayName(newFullFilename)}`)
+    router.replace(`/notes/${newFilename.value}`)
+    
+    // 连接到新的WebSocket
+    connect(newFilename.value)
     
     cancelRename()
   } catch (err: any) {
     console.error('Rename error:', err)
     renameError.value = err.response?.data?.detail || '重命名失败'
+    
+    // 重命名失败，重连到旧的WebSocket
+    const oldFilename = editorStore.currentFile
+    connect(oldFilename)
   }
 }
 
 const saveViaHttp = async () => {
   try {
-    // 确保文件名包含 .txt 后缀
-    const filename = editorStore.currentFile.toLowerCase().endsWith('.txt') 
-      ? editorStore.currentFile 
-      : `${editorStore.currentFile}.txt`
-    
     // 检查内容是否为空
     if (!editorStore.content || editorStore.content.trim() === '') {
-      if (testingMode.value) console.log('Content is empty, deleting file:', filename)
-      await filesApi.deleteFile(filename)
+      if (testingMode.value) console.log('Content is empty, deleting file:', editorStore.currentFile)
+      await filesApi.deleteFile(editorStore.currentFile)
       editorStore.setSaveStatus('saved')
       if (testingMode.value) console.log('Empty file deleted successfully')
       return
     }
     
     if (testingMode.value) {
-      console.log('Attempting HTTP save for:', filename)
+      console.log('Attempting HTTP save for:', editorStore.currentFile)
       console.log('Request payload:', { content: editorStore.content })
     }
     
-    const response = await notesApi.saveFile(filename, editorStore.content)
+    const response = await notesApi.saveFile(editorStore.currentFile, editorStore.content)
     if (testingMode.value) console.log('HTTP save response:', response)
     
     editorStore.setSaveStatus('saved')
@@ -343,14 +337,11 @@ const saveViaHttp = async () => {
 }
 
 const loadFile = async (filename: string) => {
-  // 确保文件名包含 .txt 后缀
-  const fullFilename = filename.toLowerCase().endsWith('.txt') ? filename : `${filename}.txt`
-  
   editorStore.setLoading(true)
-  editorStore.setCurrentFile(fullFilename)
+  editorStore.setCurrentFile(filename)
   
   try {
-    const response = await notesApi.getFile(fullFilename)
+    const response = await notesApi.getFile(filename)
     editorStore.setContent(response.data.content)
     editorStore.setSaveStatus('saved')
   } catch (error) {
@@ -366,21 +357,30 @@ onMounted(() => {
   editorElement.value?.focus()
   const filename = route.params.filename as string
   loadFile(filename)
-  // 确保WebSocket连接使用完整的文件名（包含.txt）
-  const fullFilename = filename.toLowerCase().endsWith('.txt') ? filename : `${filename}.txt`
-  connect(fullFilename)
+  connect(filename)
+  
+  // 监听来自FileListView的事件
+  emitter.on('disconnect-websocket', () => {
+    disconnect()
+  })
+  
+  emitter.on('connect-websocket', (filename: string) => {
+    connect(filename)
+  })
 })
 
 onUnmounted(() => {
   disconnect()
+  
+  // 清理事件监听器
+  emitter.off('disconnect-websocket', () => {})
+  emitter.off('connect-websocket', () => {})
 })
 
 watch(() => route.params.filename, (newFilename) => {
   const filename = newFilename as string
   loadFile(filename)
-  // 确保WebSocket连接使用完整的文件名（包含.txt）
-  const fullFilename = filename.toLowerCase().endsWith('.txt') ? filename : `${filename}.txt`
-  connect(fullFilename)
+  connect(filename)
 })
 </script>
 

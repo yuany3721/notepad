@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'https://api.yuany3721.site',
   timeout: 10000
 })
 
@@ -21,7 +21,10 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       // 令牌过期，清除本地存储
       localStorage.removeItem('authToken')
-      window.location.reload()
+      // 只在非密码验证页面刷新
+      if (!error.config.url?.includes('verify-password')) {
+        window.location.reload()
+      }
     }
     return Promise.reject(error)
   }
@@ -39,6 +42,7 @@ export interface FileListItem {
   filename: string
   created_at: string
   size: number
+  preview?: string
 }
 
 export interface AuthToken {
@@ -54,22 +58,22 @@ export interface FileListResponse {
 }
 
 export const notesApi = {
-  getFile: (filename: string) => api.get<TextFile>(`/notes/${filename}`),
-  saveFile: (filename: string, content: string) => 
-    api.post<TextFile>(`/notes/${filename}`, { content })
+  getFile: (filename: string) => api.get<TextFile>(`/notepad/notes/${filename}`),
+  saveFile: (filename: string, content: string) =>
+    api.post<TextFile>(`/notepad/notes/${filename}`, { content })
 }
 
 export const filesApi = {
-  getList: (page = 1, limit = 50) => 
+  getList: (page = 1, limit = 50) =>
     api.get<FileListResponse>(
-      '/files/list', { params: { page, limit } }
+      '/notepad/files/list', { params: { page, limit } }
     ),
-  verifyPassword: (password: string) => 
-    api.post<AuthToken>('/files/verify-password', { password }),
-  deleteFile: (filename: string) => 
-    api.delete(`/files/${filename}`),
-  renameFile: (filename: string, newFilename: string) => 
-    api.put(`/files/${filename}/rename?new_filename=${encodeURIComponent(newFilename)}`)
+  verifyPassword: (password: string) =>
+    api.post<AuthToken>('/notepad/files/verify-password', { password }),
+  deleteFile: (filename: string) =>
+    api.post(`/notepad/files/${filename}/delete`),
+  renameFile: (filename: string, newFilename: string) =>
+    api.post(`/notepad/files/${filename}/rename?new_filename=${encodeURIComponent(newFilename)}`)
 }
 
 export default api

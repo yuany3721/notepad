@@ -1,38 +1,20 @@
-version: '3.8'
-
 services:
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: notepad-backend
-    restart: unless-stopped
-    volumes:
-      - ${FILES_DIR:-./files}:/app/data
-    env_file:
-      - .env
-    networks:
-      - notepad-network
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: notepad-frontend
+  notepad:
+    build: 
+      context: .
+      args:
+        - APP_NAME=${APP_NAME:-Notepad}
+    container_name: notepad
     restart: unless-stopped
     ports:
-      - "${EXTERNAL_PORT:-80}:80"
-    depends_on:
-      - backend
+      - "${PORT:-80}:80"
     env_file:
       - .env
-    networks:
-      - notepad-network
-
-networks:
-  notepad-network:
-    driver: bridge
-
-volumes:
-  notepad-data:
-    driver: local
+    volumes:
+      - ${NOTES_DIR:-./data}:/app/data/notes
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${PORT:-80}/notepad/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

@@ -53,7 +53,7 @@
             </button>
           </div>
           <div class="header-actions">
-            <RouterLink to="/notes/new-file" class="btn btn-primary">
+            <RouterLink to="/" class="btn btn-primary">
                         新建文件
                       </RouterLink>            <button @click="logout" class="btn btn-secondary">
               退出
@@ -79,7 +79,7 @@
         <p v-else>
           还没有文件，创建您的第一个文件吧！
         </p>
-        <RouterLink to="/notes/new-file" class="btn btn-primary">
+        <RouterLink to="/" class="btn btn-primary">
           创建文件
         </RouterLink>
       </div>
@@ -168,6 +168,7 @@
 import { ref, onMounted, nextTick, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { filesApi, type FileListItem } from '@/services/api'
+import { emitter } from '@/utils/eventBus'
 
 const router = useRouter()
 const files = ref<FileListItem[]>([])
@@ -192,7 +193,7 @@ const fetchFiles = async () => {
     const response = await filesApi.getList()
     files.value = response.data.files
     filterFiles()
-  } catch (err) {
+  } catch (err: any) {
     if (err.response?.status === 401) {
       // 需要认证
       isAuthenticated.value = false
@@ -234,7 +235,7 @@ const verifyPassword = async () => {
     localStorage.setItem('authToken', response.data.token)
     isAuthenticated.value = true
     await fetchFiles()
-  } catch (err) {
+  } catch (err: any) {
     error.value = err.response?.data?.detail || '口令验证失败'
   } finally {
     loading.value = false
@@ -260,7 +261,7 @@ const deleteFile = async (filename: string) => {
     // 从列表中移除文件
     files.value = files.value.filter(f => f.filename !== filename)
     // filterFiles 会自动更新 filteredFiles
-  } catch (err) {
+  } catch (err: any) {
     error.value = err.response?.data?.detail || '删除文件失败'
   } finally {
     deleting.value = null
@@ -291,26 +292,51 @@ const confirmRename = async () => {
     return
   }
   
-  // 确保文件名以 .txt 结尾
-  const finalFilename = newFilename.value.toLowerCase().endsWith('.txt') 
-    ? newFilename.value 
-    : `${newFilename.value}.txt`
-  
   renaming.value = true
   renameError.value = null
   
   try {
-    await filesApi.renameFile(renamingFile.value, finalFilename)
+    // 确保传递给后端的文件名不包含.txt后缀
+    const oldFilename = getDisplayName(renamingFile.value)
+    
+    // 如果当前正在编辑这个文件，先断开WebSocket连接
+    const currentRoute = router.currentRoute.value
+    const currentFilename = currentRoute.params.filename as string
+    const isEditingCurrentFile = currentFilename === oldFilename
+    
+    if (isEditingCurrentFile) {
+      // 通过事件总线通知编辑器断开WebSocket
+      emitter.emit('disconnect-websocket')
+    }
+    
+    await filesApi.renameFile(oldFilename, newFilename.value)
     
     // 更新列表中的文件名
     const fileIndex = files.value.findIndex(f => f.filename === renamingFile.value)
     if (fileIndex !== -1) {
-      files.value[fileIndex].filename = finalFilename
+      files.value[fileIndex].filename = `${newFilename.value}.txt`
+    }
+    
+    // 如果当前正在编辑这个文件，导航到新的文件名
+    if (isEditingCurrentFile) {
+      router.push(`/editor/${newFilename.value}`)
+      // 通过事件总线通知编辑器连接新的WebSocket
+      emitter.emit('connect-websocket', newFilename.value)
     }
     
     cancelRename()
-  } catch (err) {
+  } catch (err: any) {
     renameError.value = err.response?.data?.detail || '重命名失败'
+    
+    // 重命名失败，如果当前正在编辑这个文件，重连WebSocket
+    const currentRoute = router.currentRoute.value
+    const currentFilename = currentRoute.params.filename as string
+    const oldFilename = getDisplayName(renamingFile.value)
+    
+    if (currentFilename === oldFilename) {
+      // 通过事件总线通知编辑器重连WebSocket
+      emitter.emit('connect-websocket', oldFilename)
+    }
   } finally {
     renaming.value = false
   }
