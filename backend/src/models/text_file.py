@@ -12,6 +12,7 @@ class TextFile(BaseModel):
 class FileListItem(BaseModel):
     filename: str
     created_at: datetime
+    updated_at: datetime
     size: int
     preview: Optional[str] = None
 

@@ -34,11 +34,17 @@ async def verify_password(request: PasswordRequest):
 
 @router.get("/list", response_model=FileListResponse, dependencies=[Depends(verify_token)])
 async def get_files_list(
-    page: int = Query(1, ge=1, description="页码"), limit: int = Query(50, ge=1, le=100, description="每页文件数")
+    page: int = Query(1, ge=1, description="页码"), 
+    limit: int = Query(50, ge=1, le=100, description="每页文件数"),
+    sort_by: str = Query("created_at", description="排序字段: created_at 或 updated_at")
 ):
     """获取文件列表（需要认证）"""
     try:
-        files = file_service.list_files(page, limit)
+        # 验证排序参数
+        if sort_by not in ["created_at", "updated_at"]:
+            sort_by = "created_at"
+            
+        files = file_service.list_files(page, limit, sort_by)
         total = file_service.get_total_files_count()
 
         return FileListResponse(files=files, total=total, page=page, limit=limit)

@@ -344,10 +344,16 @@ const loadFile = async (filename: string) => {
     const response = await notesApi.getFile(filename)
     editorStore.setContent(response.data.content)
     editorStore.setSaveStatus('saved')
-  } catch (error) {
+  } catch (error: any) {
     console.error('Load failed:', error)
-    editorStore.setContent('')
-    editorStore.setSaveStatus('error')
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      // 认证过期或未授权，跳转到文件列表页面
+      disconnect()
+      router.push('/list')
+    } else {
+      editorStore.setContent('')
+      editorStore.setSaveStatus('error')
+    }
   } finally {
     editorStore.setLoading(false)
   }
@@ -366,6 +372,19 @@ onMounted(() => {
   
   emitter.on('connect-websocket', (filename: string) => {
     connect(filename)
+  })
+  
+  // 监听认证过期事件
+  const handleAuthExpired = () => {
+    disconnect()
+    router.push('/list')
+  }
+  
+  window.addEventListener('auth-expired', handleAuthExpired)
+  
+  // 组件卸载时移除事件监听器
+  onUnmounted(() => {
+    window.removeEventListener('auth-expired', handleAuthExpired)
   })
 })
 

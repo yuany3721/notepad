@@ -95,7 +95,7 @@ class FileService:
         """创建新文件"""
         return self.write_file(filename, "")
 
-    def list_files(self, page: int = 1, limit: int = 50) -> List[FileListItem]:
+    def list_files(self, page: int = 1, limit: int = 50, sort_by: str = "created_at") -> List[FileListItem]:
         if page < 1:
             page = 1
 
@@ -125,6 +125,7 @@ class FileService:
                     FileListItem(
                         filename=file_path.name,
                         created_at=datetime.fromtimestamp(stat.st_ctime),
+                        updated_at=datetime.fromtimestamp(stat.st_mtime),
                         size=stat.st_size,
                         preview=preview,
                     )
@@ -132,7 +133,11 @@ class FileService:
         except Exception as e:
             raise RuntimeError(f"Error listing files: {str(e)}")
 
-        files.sort(key=lambda x: x.created_at, reverse=True)
+        # 根据参数排序
+        if sort_by == "updated_at":
+            files.sort(key=lambda x: x.updated_at, reverse=True)
+        else:  # 默认按创建时间排序
+            files.sort(key=lambda x: x.created_at, reverse=True)
 
         start = (page - 1) * limit
         end = start + limit

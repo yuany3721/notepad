@@ -21,9 +21,10 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       // 令牌过期，清除本地存储
       localStorage.removeItem('authToken')
-      // 只在非密码验证页面刷新
+      // 只在非密码验证页面触发认证状态变化事件
       if (!error.config.url?.includes('verify-password')) {
-        window.location.reload()
+        // 通过自定义事件通知应用认证状态变化
+        window.dispatchEvent(new CustomEvent('auth-expired'))
       }
     }
     return Promise.reject(error)
@@ -41,6 +42,7 @@ export interface TextFile {
 export interface FileListItem {
   filename: string
   created_at: string
+  updated_at: string
   size: number
   preview?: string
 }
@@ -64,9 +66,9 @@ export const notesApi = {
 }
 
 export const filesApi = {
-  getList: (page = 1, limit = 50) =>
+  getList: (page = 1, limit = 50, sortBy = 'created_at') =>
     api.get<FileListResponse>(
-      '/notepad/files/list', { params: { page, limit } }
+      '/notepad/files/list', { params: { page, limit, sort_by: sortBy } }
     ),
   verifyPassword: (password: string) =>
     api.post<AuthToken>('/notepad/files/verify-password', { password }),

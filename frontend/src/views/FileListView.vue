@@ -52,6 +52,11 @@
               清除
             </button>
           </div>
+          <div class="sort-box">
+            <button @click="toggleSort" class="btn btn-secondary btn-sm">
+              {{ sortBy === 'created_at' ? '按创建时间' : '按修改时间' }}
+            </button>
+          </div>
           <div class="header-actions">
             <RouterLink to="/" class="btn btn-primary">
                         新建文件
@@ -100,7 +105,8 @@
                 {{ file.preview }}
               </div>
               <div class="file-meta">
-                创建时间: {{ formatDate(file.created_at) }} | 
+                创建: {{ formatDate(file.created_at) }} | 
+                修改: {{ formatDate(file.updated_at) }} | 
                 大小: {{ formatFileSize(file.size) }}
               </div>
             </div>
@@ -165,7 +171,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick, watch } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { filesApi, type FileListItem } from '@/services/api'
 import { emitter } from '@/utils/eventBus'
@@ -176,6 +182,7 @@ const filteredFiles = ref<FileListItem[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
 const searchQuery = ref('')
+const sortBy = ref<'created_at' | 'updated_at'>('updated_at')
 const deleting = ref<string | null>(null)
 const renamingFile = ref<string | null>(null)
 const newFilename = ref('')
@@ -190,13 +197,14 @@ const fetchFiles = async () => {
   error.value = null
   
   try {
-    const response = await filesApi.getList()
+    const response = await filesApi.getList(1, 50, sortBy.value)
     files.value = response.data.files
     filterFiles()
   } catch (err: any) {
-    if (err.response?.status === 401) {
-      // 需要认证
+    if (err.response?.status === 401 || err.response?.status === 403) {
+      // 需要认证或令牌过期
       isAuthenticated.value = false
+      error.value = null
     } else {
       error.value = err instanceof Error ? err.message : '获取文件列表失败'
     }
@@ -342,6 +350,11 @@ const confirmRename = async () => {
   }
 }
 
+const toggleSort = () => {
+  sortBy.value = sortBy.value === 'created_at' ? 'updated_at' : 'created_at'
+  fetchFiles()
+}
+
 const checkAuth = () => {
   const token = localStorage.getItem('authToken')
   if (token) {
@@ -392,6 +405,20 @@ const getDisplayName = (filename: string) => {
 
 onMounted(() => {
   checkAuth()
+  
+  // 监听认证过期事件
+  const handleAuthExpired = () => {
+    isAuthenticated.value = false
+    error.value = null
+    files.value = []
+  }
+  
+  window.addEventListener('auth-expired', handleAuthExpired)
+  
+  // 组件卸载时移除事件监听器
+  onUnmounted(() => {
+    window.removeEventListener('auth-expired', handleAuthExpired)
+  })
 })
 </script>
 
@@ -630,6 +657,11 @@ onMounted(() => {
   background-color: #7f8c8d;
 }
 
+.sort-box {
+  display: flex;
+  align-items: center;
+}
+
 .header-actions {
   display: flex;
   gap: 1rem;
@@ -683,6 +715,7 @@ onMounted(() => {
   
   .header-right {
     flex-direction: column;
+    align-items: stretch;
     gap: 1rem;
   }
   
@@ -699,6 +732,14 @@ onMounted(() => {
     width: 100%;
     justify-content: stretch;
     gap: 0.5rem;
+  }
+  
+  .sort-box {
+    width: 100%;
+  }
+  
+  .sort-box .btn {
+    width: 100%;
   }
   
   .header-actions .btn {
